@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Mendoza - Cartografía Digital a nivel de Departamento</title>
+    <title>Mendoza - Cartografía Digital</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.css" />
     
@@ -13,7 +13,7 @@
         }
         /* Tipografía institucional y estilo limpio */
         body {
-            font-family: 'Open Sans', sans-serif;
+            font-family: 'Open Sans', sans-serif; /* Mantiene la legibilidad y neutralidad de la marca */
         }
         .info {
             background: white;
@@ -56,15 +56,34 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.js"></script>
 
 <script>
-    // Inicializamos el mapa principal centrado en Mendoza
-    const map = L.map('map').setView([-34.6, -68.5], 7);
+    // --- DEFINICIÓN DE SERVICIOS DE CAPAS BASE ---
+    const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    });
 
-    // Capa base principal
-    const mainTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: 'OSM'
-    }).addTo(map);
+    const cartoPositron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap contributors © CARTO'
+    });
 
-    // Definición de rangos de población para la coropleta
+    const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap contributors © CARTO'
+    });
+
+    // Inicializamos el mapa principal con la capa de Grises por defecto para resaltar el GeoJSON
+    const map = L.map('map', {
+        center: [-34.6, -68.5],
+        zoom: 7,
+        layers: [cartoPositron] 
+    });
+
+    // Estructura para el menú de control de capas
+    const baseMaps = {
+        "Mapa Estándar (OSM)": osmStandard,
+        "Mapa de Grises": cartoPositron,
+        "Modo Nocturno": cartoDark
+    };
+
+    // --- DEFINICIÓN DE INTERVALOS DE POBLACIÓN (COROPLETA) ---
     function c(v) {
         return v > 200000 ? '#800026' :
                v > 100000 ? '#BD0026' :
@@ -97,35 +116,36 @@
         
         div.innerHTML = '<h4>Población</h4>';
 
-        // Recorremos los intervalos para generar las etiquetas con sus colores
         for (let i = 0; i < grades.length; i++) {
             div.innerHTML +=
                 '<i style="background:' + c(grades[i] + 1) + '"></i> ' +
                 grades[i].toLocaleString() + (grades[i + 1] ? ' &ndash; ' + grades[i + 1].toLocaleString() + '<br>' : '+');
         }
-
         return div;
     };
 
     legend.addTo(map);
 
-    // --- 3. MAPA DE REFERENCIA (ARGENTINA) ---
-    // Creamos una capa base independiente para el mini-mapa
-    const miniMapTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    // --- 3. SELECCIÓN DE CAPAS DISPONIBLES EN MENÚ ---
+    // Agregamos el menú interactivo arriba a la derecha
+    L.control.layers(baseMaps, null, { collapsed: false }).addTo(map);
+
+    // --- 4. MAPA DE REFERENCIA (ARGENTINA) ---
+    const miniMapTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png');
     
     const miniMap = new L.Control.MiniMap(miniMapTile, {
         position: 'bottomleft',
-        toggleDisplay: true, // Permite minimizarlo si el usuario lo desea
+        toggleDisplay: true,
         minimized: false,
         width: 150,
         height: 200,
-        aimingRectOptions: { color: "#2EA3F2", weight: 1 }, // Color institucional para el rectángulo guía
+        aimingRectOptions: { color: "#2EA3F2", weight: 1 }, // Rectángulo guía en el azul tecnológico de la marca
         shadowRectOptions: { color: "#000000", weight: 1, opacity: 0, fillOpacity: 0 },
-        zoomLevelFixed: 3 // Fijamos el zoom a escala macro para ver Argentina entera
+        zoomLevelFixed: 3 
     }).addTo(map);
 
 
-    // --- 4. CARGA DE DATOS GEOGRAPHICOS (GEOJSON) ---
+    // --- 5. CARGA DE DATOS GEOGRÁFICOS (GEOJSON) ---
     fetch('depto_mendoza.geojson') 
         .then(r => {
             if (!r.ok) throw new Error("No se pudo encontrar el archivo GeoJSON");
@@ -142,7 +162,7 @@
                 onEachFeature: (f, l) => {
                     l.on({
                         mouseover: e => {
-                            e.target.setStyle({ weight: 3, color: '#2EA3F2' }); // Hover con color destacado de tu marca
+                            e.target.setStyle({ weight: 3, color: '#2EA3F2' }); 
                             info.update(f.properties);
                         },
                         mouseout: e => {
@@ -161,7 +181,7 @@
             console.error("Error SIG:", err);
         });
 
-    L.control.scale({ imperial: false }).addTo(map); // Escala métrica oficializada
+    L.control.scale({ imperial: false }).addTo(map);
 </script>
 </body>
 </html>
