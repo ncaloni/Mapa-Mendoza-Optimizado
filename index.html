@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Mendoza - Cartografía Digital a nivel de Departamento</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.css" />
+    
+    <style>
+        html, body, #map {
+            height: 100%;
+            margin: 0;
+        }
+        /* Tipografía institucional y estilo limpio */
+        body {
+            font-family: 'Open Sans', sans-serif;
+        }
+        .info {
+            background: white;
+            padding: 8px 12px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.15);
+            border-radius: 5px;
+        }
+        /* Estilos profesionales para la Leyenda de referencias */
+        .legend {
+            background: white;
+            padding: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.15);
+            border-radius: 5px;
+            line-height: 20px;
+            color: #333;
+        }
+        .legend h4 {
+            margin: 0 0 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4px;
+        }
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: .8;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.js"></script>
+
+<script>
+    // Inicializamos el mapa principal centrado en Mendoza
+    const map = L.map('map').setView([-34.6, -68.5], 7);
+
+    // Capa base principal
+    const mainTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'OSM'
+    }).addTo(map);
+
+    // Definición de rangos de población para la coropleta
+    function c(v) {
+        return v > 200000 ? '#800026' :
+               v > 100000 ? '#BD0026' :
+               v > 50000  ? '#E31A1C' :
+               v > 20000  ? '#FC4E2A' :
+                            '#FD8D3C';
+    }
+
+    // --- 1. CONTROL DE INFORMACIÓN (HOVER) ---
+    const info = L.control();
+
+    info.onAdd = function () {
+        this._div = L.DomUtil.create('div', 'info');
+        this.update();
+        return this._div;
+    };
+
+    info.update = function (p) {
+        this._div.innerHTML = p ? '<b>' + p.nam + '</b><br>Población: ' + Number(p.value).toLocaleString() : 'Pase el mouse sobre un departamento';
+    };
+
+    info.addTo(map);
+
+    // --- 2. CONTROL DE LEYENDA / REFERENCIAS ---
+    const legend = L.control({ position: 'bottomright' });
+
+    legend.onAdd = function () {
+        const div = L.DomUtil.create('div', 'legend');
+        const grades = [0, 20000, 50000, 100000, 200000];
+        
+        div.innerHTML = '<h4>Población</h4>';
+
+        // Recorremos los intervalos para generar las etiquetas con sus colores
+        for (let i = 0; i < grades.length; i++) {
+            div.innerHTML +=
+                '<i style="background:' + c(grades[i] + 1) + '"></i> ' +
+                grades[i].toLocaleString() + (grades[i + 1] ? ' &ndash; ' + grades[i + 1].toLocaleString() + '<br>' : '+');
+        }
+
+        return div;
+    };
+
+    legend.addTo(map);
+
+    // --- 3. MAPA DE REFERENCIA (ARGENTINA) ---
+    // Creamos una capa base independiente para el mini-mapa
+    const miniMapTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    
+    const miniMap = new L.Control.MiniMap(miniMapTile, {
+        position: 'bottomleft',
+        toggleDisplay: true, // Permite minimizarlo si el usuario lo desea
+        minimized: false,
+        width: 150,
+        height: 200,
+        aimingRectOptions: { color: "#2EA3F2", weight: 1 }, // Color institucional para el rectángulo guía
+        shadowRectOptions: { color: "#000000", weight: 1, opacity: 0, fillOpacity: 0 },
+        zoomLevelFixed: 3 // Fijamos el zoom a escala macro para ver Argentina entera
+    }).addTo(map);
+
+
+    // --- 4. CARGA DE DATOS GEOGRAPHICOS (GEOJSON) ---
+    fetch('depto_mendoza.geojson') 
+        .then(r => {
+            if (!r.ok) throw new Error("No se pudo encontrar el archivo GeoJSON");
+            return r.json();
+        })
+        .then(g => {
+            const lyr = L.geoJSON(g, {
+                style: f => ({
+                    fillColor: c(f.properties.value),
+                    weight: 1,
+                    color: '#fff',
+                    fillOpacity: .7
+                }),
+                onEachFeature: (f, l) => {
+                    l.on({
+                        mouseover: e => {
+                            e.target.setStyle({ weight: 3, color: '#2EA3F2' }); // Hover con color destacado de tu marca
+                            info.update(f.properties);
+                        },
+                        mouseout: e => {
+                            lyr.resetStyle(e.target);
+                            info.update();
+                        },
+                        click: e => map.fitBounds(e.target.getBounds())
+                    });
+                    l.bindPopup('<b>' + f.properties.nam + '</b><br>Población: ' + Number(f.properties.value).toLocaleString());
+                }
+            }).addTo(map);
+
+            map.fitBounds(lyr.getBounds());
+        })
+        .catch(err => {
+            console.error("Error SIG:", err);
+        });
+
+    L.control.scale({ imperial: false }).addTo(map); // Escala métrica oficializada
+</script>
+</body>
+</html>
